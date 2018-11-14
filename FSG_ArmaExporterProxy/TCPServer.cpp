@@ -8,6 +8,8 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 
+#include "DataProcess.hpp"
+
 #define PORT 54000  // the port users will be connecting to
 
 int main (void)
@@ -56,21 +58,51 @@ int main (void)
 
 	//While loop: Accept and echo message back to client
 	char buf[4096]; //limited message lenght, should be listening until end of character
+	DataProcess* dataProcess;
+	bool isInitialized = false;
 	while (true) {
 		memset (buf, 0, 4096);
 
 		//Wait for client to send data
-		int bytesReceived = recv (clientSocket, buf, 4096, 0);
+		long bytesReceived = recv (clientSocket, buf, 4096, 0);
 		if (bytesReceived == -1) {
 			std::cerr << "Error on recv(). Quitting" << std::endl;
+			//delete dataProcess;
 			break;
 		}
 		if (bytesReceived == 0) {
 			std::cout << "Client disconnected" << std::endl;
+			//delete dataProcess;
 			break;
 		}
-
-		//Echo message back to client
+		//Proccess Data Commands
+		std::string data (buf);
+		if (data.substr(0,6).compare("start-") == 0) {
+			isInitialized = true;
+			//Create File with mission Name & and DateTime
+			dataProcess = new DataProcess(data.substr(6));
+		}
+		else if (data.substr (0, 5).compare ("start") == 0) {
+			isInitialized = true;
+			//Create File with mission DateTime
+			dataProcess = new DataProcess();
+		}
+		else if ((data.substr (0, 5).compare ("end") == 0)) {
+			//SEND DATA
+			//TODO Send Data Over FTP
+			//CLEAN DATA
+			//delete dataProcess;
+		}
+		else if(isInitialized){
+			dataProcess->appendData (data);
+			//Echo message back to client
+			send (clientSocket, buf, bytesReceived + 1, 0);
+		}
+		else {
+			std::ostringstream ss;
+			ss << "NotInitialized";
+			send (clientSocket, ss.str ().c_str(), ss.str ().size() + 1, 0);
+		}
 		send (clientSocket, buf, bytesReceived + 1, 0);
 	}
 
